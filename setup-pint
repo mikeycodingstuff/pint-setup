@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+ENV_FILE="$(dirname "$(realpath "$0")")/.env"
+
+# Check if .env exists in this script's directory
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ .env file is missing."
+  exit 1
+fi
+
+source "$ENV_FILE"
+
+# Ensure PINT_CONFIG_URL is set
+if [ -z "${PINT_CONFIG_URL:-}" ]; then
+  echo "❌ PINT_CONFIG_URL is not set in $ENV_FILE"
+  exit 1
+fi
+
+# Install Laravel Pint if not already in require-dev
+if awk '/"require-dev"/,/\}/' composer.json | grep -q '"laravel/pint"'; then
+    echo "✅ laravel/pint already present in require-dev."
+else
+    composer require laravel/pint --dev
+fi
+
+# 2. Download custom rules, but check if pint.json already exists
+CONFIG_FILE="pint.json"
+
+if [ -f "$CONFIG_FILE" ]; then
+    echo "⚠️ $CONFIG_FILE already exists."
+    read -rp "Do you want to overwrite it with the remote version? [y/n]: " choice
+    case "$choice" in 
+      y|Y ) curl -o "$CONFIG_FILE" "$PINT_CONFIG_URL"; echo "✅ $CONFIG_FILE overwritten.";;
+      * ) echo "❎ Skipped downloading $CONFIG_FILE.";;
+    esac
+else
+    curl -o "$CONFIG_FILE" "$PINT_CONFIG_URL"
+    echo "✅ $CONFIG_FILE downloaded."
+fi
+
+echo "✅ Pint installed and custom rules handled."
